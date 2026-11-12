@@ -42,7 +42,9 @@ const $=s=>document.querySelector(s),K='pt2',uid=()=>Date.now().toString(36)+Mat
 const iso=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
 let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},S||{});
-let v='todo',f={tab:'all',cat:'',q:'',open:0},D=null;
+let v='todo',f={tab:'all',cat:'',q:'',open:0},D=null,P={g:null,i:null},ip=null;
+const mig=()=>S.groups.forEach(g=>g.it.forEach(i=>{if(!i.ls){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}}));mig();
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e});
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}},T=(a,e)=>S.lang==='ar'?a:e,loc=()=>S.lang==='ar'?'ar-EG':'en-GB';
 const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const due=x=>x.d?new Date(x.d+'T'+(x.tm||'23:59')):null,od=x=>!x.x&&due(x)&&due(x)<new Date();
@@ -64,16 +66,20 @@ function todo(){const A=S.tasks,dn=A.filter(x=>x.x).length,cats=[...new Set([...
 return `<h1>${T('اليوم','Today')}</h1><div class="sub" id="clk"></div><div class="card"><div class="row"><b>${T('تقدم المهام','Tasks progress')}</b><b>${pct(dn,A.length)}%</b></div>${bar(pct(dn,A.length))}<small>${dn} / ${A.length} ${T('منجزة','done')}</small></div>
 <input id="q" class="in" placeholder="🔍 ${T('بحث','Search')}" value="${E(f.q)}"><div class="chips"><button class="chip${f.cat?'':' on'}" data-a="fc" data-i="">${T('الكل','All')}</button>${cats.map(c=>`<button class="chip${f.cat===c?' on':''}" data-a="fc" data-i="${E(c)}">${E(c)}</button>`).join('')}</div>
 <div class="tabs">${[['all',T('الكل','All'),A.length],['act',T('نشطة','Active'),A.filter(x=>!x.x).length],['over',T('متأخرة','Overdue'),A.filter(od).length],['done',T('منجزة','Done'),dn]].map(([k,l,n])=>`<button class="${f.tab===k?'on':''}" data-a="tb" data-i="${k}">${l} ${n}</button>`).join('')}</div><div id="lst">${lst()}</div>`}
-function track(){let a=0,b=0;S.groups.forEach(g=>g.it.forEach(i=>{a+=i.done;b+=i.total}));
-return `<h1>${T('جدول الإنجاز','Progress')}</h1><div class="sub" id="clk"></div><div class="card"><div class="row"><b>${T('الإنجاز العام','Overall')}</b><b>${pct(a,b)}%</b></div>${bar(pct(a,b))}</div>`+
-S.groups.map(g=>{let x=0,y=0;g.it.forEach(i=>{x+=i.done;y+=i.total});return `<section class="card"><div class="gh"><h2>${E(g.n)}</h2><b>${pct(x,y)}%</b><button class="ic" data-a="dg" data-i="${g.id}">✕</button></div>${bar(pct(x,y))}`+
-g.it.map(i=>{const k=`${g.id}|${i.id}`;return `<div class="it"><div class="ih"><b>${E(i.n)}</b><span>${i.done}/${i.total} · ${pct(i.done,i.total)}%</span></div>${bar(pct(i.done,i.total))}<div class="ia"><button data-a="dec" data-i="${k}">−</button><button data-a="inc" data-i="${k}">＋</button><button data-a="et" data-i="${k}">✎</button><button data-a="di" data-i="${k}">✕</button>${i.last?`<small>${T('آخر إنجاز','Last')}: ${new Date(i.last).toLocaleString(loc(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small>`:''}</div></div>`}).join('')+
-`<button class="lnk" data-a="ai" data-i="${g.id}">＋ ${T('إضافة مادة / مشروع','Add subject / project')}</button></section>`}).join('')+
-`<button class="btn w" data-a="ag">＋ ${T('قسم جديد (مثل: مواد الكلية)','New group (e.g. College)')}</button>`}
+const dn=i=>i.ls.length,tot=i=>Math.max(i.total,i.ls.length),sum=a=>a.reduce((r,i)=>[r[0]+dn(i),r[1]+tot(i)],[0,0]);
+const cur=()=>S.groups.find(a=>a.id===P.g).it.find(a=>a.id===P.i),crumb=(...a)=>`<div class="row"><button class="ic" data-a="bk">${S.lang==='ar'?'→':'←'} ${T('رجوع','Back')}</button><small>${a.join(' › ')}</small></div>`;
+const ov=(a,b,l)=>`<div class="card"><div class="row"><b>${l}</b><b>${pct(a,b)}%</b></div>${bar(pct(a,b))}<small>${a} / ${b}</small></div>`;
+function track(){const G=S.groups.find(a=>a.id===P.g),I=G&&G.it.find(a=>a.id===P.i);
+if(I)return crumb(E(G.n),E(I.n))+`<h1>${E(I.n)}</h1>`+ov(dn(I),tot(I),T('التقدم في المادة','Subject progress'))+`<div class="ia"><button data-a="et">✎ ${T('العدد الكلي','Total')}</button><button data-a="di">✕ ${T('حذف المادة','Delete')}</button></div>
+<h3>${T('سجّل محاضرة أنجزتها','Log a finished lecture')}</h3><div class="two"><input id="nl" class="in" placeholder="${T('اسم المحاضرة (أو عدة محاضرات بفاصلة)','Lecture name (or several, comma-separated)')}"><button class="btn" style="flex:none" data-a="al">＋</button></div>`+
+[...I.ls].reverse().map(l=>`<div class="task"><button class="ck p1">✓</button><div class="bd" data-a="el" data-i="${l.id}"><b>${E(l.n)}</b><div class="mt"><span>📅 ${new Date(l.at).toLocaleString(loc(),{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div></div><button class="ic" data-a="rl" data-i="${l.id}">✕</button></div>`).join('');
+if(G)return crumb(E(G.n))+`<h1>📁 ${E(G.n)}</h1>`+ov(...sum(G.it),T('إنجاز القسم','Section progress'))+G.it.map(i=>`<div class="card" data-a="oi" data-i="${i.id}"><div class="ih"><b>${E(i.n)}</b><span>${dn(i)}/${tot(i)} · ${pct(dn(i),tot(i))}%</span></div>${bar(pct(dn(i),tot(i)))}</div>`).join('')+`<button class="btn w" data-a="ai" data-i="${G.id}">＋ ${T('مادة / مشروع جديد','New subject / project')}</button><button class="lnk" data-a="dg" data-i="${G.id}">✕ ${T('حذف القسم','Delete section')}</button>`;
+return `<h1>${T('جدول الإنجاز','Progress')}</h1><div class="sub" id="clk"></div>`+ov(...sum(S.groups.flatMap(g=>g.it)),T('الإنجاز العام','Overall'))+S.groups.map(g=>{const[x,y]=sum(g.it);return `<div class="card" data-a="og" data-i="${g.id}"><div class="gh"><h2>📁 ${E(g.n)}</h2><b>${pct(x,y)}%</b></div>${bar(pct(x,y))}<small>${g.it.length} ${T('مادة / مشروع','items')} · ${x}/${y}</small></div>`}).join('')+`<button class="btn w" data-a="ag">＋ ${T('قسم جديد (مثل: مواد الكلية)','New section (e.g. College)')}</button>`}
 const seg=(k,o)=>`<div class="chips">${o.map(([a,l])=>`<button class="chip${S[k]===a?' on':''}" data-a="st" data-k="${k}" data-i="${a}">${l}</button>`).join('')}</div>`;
 function sets(){const n='Notification'in window?Notification.permission:'denied';
 return `<h1>${T('الإعدادات','Settings')}</h1><div class="card"><b>${T('المظهر','Theme')}</b>${seg('th',[['light',T('فاتح','Light')],['dark',T('داكن','Dark')],['sepia',T('مريح للعين','Eye comfort')]])}<b>${T('حجم الخط','Font size')}</b>${seg('fs',[['s',T('صغير','Small')],['m',T('متوسط','Medium')],['l',T('كبير','Large')]])}<b>${T('اللغة','Language')}</b>${seg('lang',[['ar','العربية'],['en','English']])}</div>
 <div class="card"><b>${T('الإشعارات','Notifications')}</b><p class="mu">${T('المهام المهمة جدًا والمتوسطة تظهر في شريط الإشعارات. التنبيهات تعمل بدقة والتطبيق مفتوح أو في الخلفية.','High and medium tasks appear in the notification shade. Reminders fire reliably while the app is open or in the background.')}</p><button class="btn w" data-a="en">${n==='granted'?T('✓ مفعّلة','✓ Enabled'):T('تفعيل الإشعارات','Enable notifications')}</button></div>
+<div class="card"><b>${T('تثبيت على الشاشة الرئيسية','Install on home screen')}</b><button class="btn w" data-a="inst">${T('تثبيت التطبيق','Install app')}</button></div>
 <div class="card"><b>${T('نسخة احتياطية','Backup')}</b><div class="two"><button class="btn o" data-a="ex">${T('تصدير','Export')}</button><button class="btn o" data-a="im">${T('استيراد','Import')}</button></div></div>`}
 function openSheet(id){D=id?JSON.parse(JSON.stringify(S.tasks.find(x=>x.id===id))):{id:uid(),t:'',n:'',d:'',tm:'',rm:-1,rp:'',p:2,c:'',pin:true,sub:[],lk:'',x:0};draw()}
 function sync(){if(!D)return;[['t','ft'],['n','fn'],['d','fd'],['tm','ftm'],['c','fc'],['lk','fl']].forEach(([k,i])=>{const e=$('#'+i);if(e)D[k]=e.value});D.rm=+$('#fr').value;D.rp=$('#frp').value;D.pin=$('#fpin').checked}
@@ -93,7 +99,7 @@ $('#sh').innerHTML=`<div class="bx"><h2>${S.tasks.some(x=>x.id===d.id)?T('تعد
 <div class="two"><input id="fs" class="in" placeholder="${T('أضف مهمة فرعية','Add a subtask')}"><button class="btn" style="flex:none" data-a="as">＋</button></div>
 ${lk.length?`<label>${T('اربطها بمادة في جدول الإنجاز','Link to a progress item')}</label><select id="fl">${op([['',T('بدون','None')],...lk],d.lk)}</select>`:''}
 <div class="two" style="margin-top:16px"><button class="btn o" data-a="cx">${T('إلغاء','Cancel')}</button><button class="btn" data-a="sv">${T('حفظ','Save')}</button></div></div>`;$('#sh').hidden=0}
-const lkd=(x,dl)=>{if(!x.lk)return;const[g,i]=x.lk.split(':'),it=(S.groups.find(a=>a.id===g)||{it:[]}).it.find(a=>a.id===i);if(it){it.done=Math.max(0,Math.min(it.total,it.done+dl));if(dl>0)it.last=Date.now()}};
+const lkd=(x,dl)=>{if(!x.lk)return;const[g,i]=x.lk.split(':'),t=(S.groups.find(a=>a.id===g)||{it:[]}).it.find(a=>a.id===i);if(!t)return;const id='t'+x.id;t.ls=t.ls.filter(l=>l.id!==id);if(dl>0)t.ls.push({id,n:x.t,at:Date.now()})};
 const nd=(d,r)=>{const t=new Date(d+'T00:00');r==='d'?t.setDate(t.getDate()+1):r==='w'?t.setDate(t.getDate()+7):r==='m'?t.setMonth(t.getMonth()+1):t.setFullYear(t.getFullYear()+1);return iso(t)};
 const pr=(m,def)=>{const r=prompt(m,def);return r&&r.trim()?r.trim():null},it2=i=>{const[g,k]=i.split('|'),G=S.groups.find(a=>a.id===g);return[G,G.it.find(a=>a.id===k)]},up=()=>{save();render()};
 const H={nv:i=>{v=i;render()},tb:i=>{f.tab=i;render()},fc:i=>{f.cat=i;render()},co:()=>{f.open=!f.open;$('#lst').innerHTML=lst()},add:()=>openSheet(),ed:i=>openSheet(i),
@@ -105,18 +111,21 @@ as:()=>{sync();const e=$('#fs').value.trim();if(e){D.sub.push({t:e,x:0});draw()}
 cx:()=>{D=null;$('#sh').hidden=1},sv:()=>{sync();if(!D.t.trim())return toast(T('اكتب عنوان المهمة','Enter a title'));D.t=D.t.trim();D.fired=0;
 const n=S.tasks.findIndex(x=>x.id===D.id);if(n<0)S.tasks.push(D);else{if(S.tasks[n].lk!==D.lk&&S.tasks[n].x){lkd(S.tasks[n],-1);D.x&&lkd(D,1)}S.tasks[n]=D}
 if(D.c&&!S.cats.includes(D.c))S.cats.push(D.c);D=null;$('#sh').hidden=1;up();pins()},
-ag:()=>{const n=pr(T('اسم القسم؟ (مثال: مواد الكلية)','Group name?'));if(n){S.groups.push({id:uid(),n,it:[]});up()}},
-ai:i=>{const n=pr(T('اسم المادة أو المشروع؟','Name?'));if(!n)return;const t=parseInt(pr(T('العدد الكلي للأجزاء (محاضرات مثلًا)؟','Total parts (e.g. lectures)?'),'10'));if(t>0){S.groups.find(a=>a.id===i).it.push({id:uid(),n,total:t,done:0});up()}},
-dg:i=>{if(confirm(T('حذف القسم بكل ما فيه؟','Delete group?'))){S.groups=S.groups.filter(a=>a.id!==i);up()}},
-inc:i=>{const[,x]=it2(i);x.done=Math.min(x.total,x.done+1);x.last=Date.now();up()},dec:i=>{const[,x]=it2(i);x.done=Math.max(0,x.done-1);up()},
-et:i=>{const[,x]=it2(i),t=parseInt(pr(T('العدد الكلي؟','Total parts?'),x.total));if(t>0){x.total=t;x.done=Math.min(x.done,t);up()}},
-di:i=>{const[g,x]=it2(i);if(confirm(T('حذف؟','Delete?'))){g.it=g.it.filter(a=>a!==x);up()}},
+og:i=>{P={g:i,i:null};render()},oi:i=>{P.i=i;render()},bk:()=>{P.i?P.i=null:P.g=null;render()},
+ag:()=>{const n=pr(T('اسم القسم؟ (مثال: مواد الكلية)','Section name?'));if(n){S.groups.push({id:uid(),n,it:[]});up()}},
+ai:i=>{const n=pr(T('اسم المادة أو المشروع؟','Name?'));if(!n)return;const t=parseInt(pr(T('العدد الكلي للمحاضرات/الأجزاء؟','Total lectures/parts?'),'10'));if(t>0){S.groups.find(a=>a.id===i).it.push({id:uid(),n,total:t,ls:[]});up()}},
+dg:i=>{if(confirm(T('حذف القسم بكل ما فيه؟','Delete section?'))){S.groups=S.groups.filter(a=>a.id!==i);P={g:null,i:null};up()}},
+al:()=>{const e=$('#nl'),I=cur(),a=e.value.split(/[,،]/).map(x=>x.trim()).filter(Boolean);if(!a.length)a.push(T('محاضرة ','Lecture ')+(I.ls.length+1));a.forEach(n=>I.ls.push({id:uid(),n,at:Date.now()}));up()},
+rl:i=>{const I=cur();I.ls=I.ls.filter(l=>l.id!==i);up()},el:i=>{const l=cur().ls.find(a=>a.id===i),n=pr(T('اسم المحاضرة؟','Lecture name?'),l.n);if(n){l.n=n;up()}},
+et:()=>{const I=cur(),t=parseInt(pr(T('العدد الكلي؟','Total?'),I.total));if(t>0){I.total=t;up()}},
+di:()=>{if(confirm(T('حذف المادة؟','Delete?'))){const G=S.groups.find(a=>a.id===P.g);G.it=G.it.filter(a=>a.id!==P.i);P.i=null;up()}},
+inst:()=>ip?ip.prompt():toast(T('افتح قائمة كروم ⋮ واختر «تثبيت التطبيق»','Chrome menu ⋮ → Install app')),
 st:(i,b)=>{S[b.dataset.k]=i;up()},en:()=>{if(!('Notification'in window))return toast(T('المتصفح لا يدعم الإشعارات','Not supported'));Notification.requestPermission().then(()=>{render();pins()})},
 ex:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='progress-backup-'+iso(new Date())+'.json';a.click()},im:()=>$('#imp').click()};
 document.addEventListener('click',e=>{if(e.target.id==='sh')return H.cx();const b=e.target.closest('[data-a]');if(b&&H[b.dataset.a])H[b.dataset.a](b.dataset.i,b)});
 document.addEventListener('input',e=>{if(e.target.id==='q'){f.q=e.target.value.toLowerCase();$('#lst').innerHTML=lst()}});
-$('#imp').addEventListener('change',e=>{const r=new FileReader();r.onload=()=>{try{S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},JSON.parse(r.result));up();toast('✓')}catch(x){toast(T('ملف غير صالح','Invalid file'))}};r.readAsText(e.target.files[0])});
-const gr=()=>'Notification'in window&&Notification.permission==='granted';
+$('#imp').addEventListener('change',e=>{const r=new FileReader();r.onload=()=>{try{S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},JSON.parse(r.result));mig();up();toast('✓')}catch(x){toast(T('ملف غير صالح','Invalid file'))}};r.readAsText(e.target.files[0])});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nl')H.al()});const gr=()=>'Notification'in window&&Notification.permission==='granted';
 async function ntf(ti,bo,tag,pin){if(!gr())return false;try{const r=await navigator.serviceWorker.ready;await r.showNotification(ti,{body:bo,tag,icon:'icon-192.png',requireInteraction:pin,silent:pin,data:{pin,title:ti,body:bo}});return true}catch(e){return false}}
 async function pins(){if(!gr())return;try{const r=await navigator.serviceWorker.ready,w=S.tasks.filter(x=>!x.x&&x.pin&&x.p>=2),cur=await r.getNotifications(),tg=new Set(w.map(x=>'pin-'+x.id));
 cur.forEach(n=>{if(n.tag.startsWith('pin-')&&!tg.has(n.tag))n.close()});const have=new Set(cur.map(n=>n.tag));
