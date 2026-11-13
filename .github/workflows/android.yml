@@ -1,5 +1,10 @@
 name: Build Android APK
-on: [push, workflow_dispatch]
+on:
+  push:
+    paths-ignore: ['README.md']
+  workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -12,6 +17,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Use the fixed signing key
+        run: |
+          mkdir -p ~/.android
+          if [ -f debug.keystore ]; then cp debug.keystore ~/.android/debug.keystore; else echo "::warning::debug.keystore not found - signature will change every build"; fi
       - name: Build
         run: |
           mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png www/
@@ -20,9 +29,23 @@ jobs:
           npx cap sync android
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/><uses-permission android:name="android.permission.USE_EXACT_ALARM"/><uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><application#' $M
-          mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
           cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: enjazi-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk enjazi.apk
+          cat > notes.md <<EOF
+          ## 📲 إنجازي — آخر نسخة
+          1. حمّل الملف **enjazi.apk** من قسم Assets تحت.
+          2. افتحه من تليفونك واضغط تثبيت (لو طلب السماح بالتثبيت من المتصفح، اسمح).
+
+          آخر تحديث: commit ${GITHUB_SHA::7}
+          EOF
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest enjazi.apk --target "$GITHUB_SHA" --latest --title "إنجازي — آخر نسخة" --notes-file notes.md
