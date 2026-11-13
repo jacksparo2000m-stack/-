@@ -4,7 +4,7 @@ on:
     paths-ignore: ['README.md']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -21,31 +21,34 @@ jobs:
         run: |
           mkdir -p ~/.android
           if [ -f debug.keystore ]; then cp debug.keystore ~/.android/debug.keystore; else echo "::warning::debug.keystore not found - signature will change every build"; fi
-      - name: Build
+      - name: Install dependencies and build Android app
         run: |
-          mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png www/
-          npm install
+          mkdir -p www
+          cp index.html manifest.json sw.js icon-192.png icon-512.png www/
+          npm install --no-audit --no-fund
+          npm run build:native
           npx cap add android
           npx cap sync android
+          A=android/app/src/main/assets
+          cmp index.html "$A/public/index.html"
+          cmp www/native.js "$A/public/native.js"
           M=android/app/src/main/AndroidManifest.xml
-          sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/><uses-permission android:name="android.permission.USE_EXACT_ALARM"/><uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><application#' $M
-          cd android && chmod +x gradlew && ./gradlew assembleDebug
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application#' "$M"
+          grep -q 'android.permission.SCHEDULE_EXACT_ALARM' "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application#' "$M"
+          grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <application#' "$M"
+          grep -q 'android.permission.WAKE_LOCK' "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <application#' "$M"
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Verify the APK contains the built web assets
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -p "$APK" assets/public/index.html | cmp - index.html
+          unzip -p "$APK" assets/public/native.js | cmp - www/native.js
       - uses: actions/upload-artifact@v4
         with:
           name: enjazi-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Publish APK to GitHub Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk enjazi.apk
-          cat > notes.md <<EOF
-          ## 📲 إنجازي — آخر نسخة
-          1. حمّل الملف **enjazi.apk** من قسم Assets تحت.
-          2. افتحه من تليفونك واضغط تثبيت (لو طلب السماح بالتثبيت من المتصفح، اسمح).
-
-          آخر تحديث: commit ${GITHUB_SHA::7}
-          EOF
-          gh release delete latest --cleanup-tag --yes || true
-          gh release create latest enjazi.apk --target "$GITHUB_SHA" --latest --title "إنجازي — آخر نسخة" --notes-file notes.md
+          if-no-files-found: error
+          retention-days: 14
