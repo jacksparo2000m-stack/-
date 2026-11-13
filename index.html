@@ -37,14 +37,15 @@ nav button{flex:1;padding:10px;display:flex;flex-direction:column;align-items:ce
 .wr{position:relative;display:flex;gap:8px;justify-content:center;margin:6px 0}.wr:before{content:'';position:absolute;top:40px;height:40px;inset-inline:25%;background:var(--ac2);border-radius:10px}.wc{position:relative;height:120px;width:80px;overflow-y:auto;scroll-snap-type:y mandatory;padding:40px 0;scrollbar-width:none}.wi{height:40px;scroll-snap-align:center;display:grid;place-items:center;font-size:1.2rem}
 </style></head><body>
 <main id="app"></main><button id="fab" class="fab" data-a="add">＋</button><nav id="nav"></nav>
-<div id="sh" class="sh" hidden></div><div id="ts" class="ts" hidden></div><input type="file" id="imp" accept=".json" hidden>
+<div id="sh" class="sh" hidden></div><div id="ts" class="ts" hidden></div><input type="file" id="imp" accept=".json,application/json,text/plain,application/octet-stream" hidden>
+<script>if(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())document.write('<script src="native.js"><\/script>')</script>
 <script>
 const $=s=>document.querySelector(s),K='pt2',uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6),p2=n=>String(n).padStart(2,'0');
 const iso=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
 let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},S||{});
 let v='todo',f={tab:'all',cat:'',q:'',open:0},D=null,P={g:null,i:null},ip=null;
-const mig=()=>{S.tasks.forEach(x=>{if(!x.rms)x.rms=x.rm>=0?[x.rm]:[]});S.groups.forEach(g=>g.it.forEach(i=>{if(!i.ls){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}}))};mig();
+const mig=()=>{S.tasks.forEach(x=>{if(!Array.isArray(x.rms))x.rms=x.rm>=0?[x.rm]:[]});S.groups.forEach(g=>g.it.forEach(i=>{if(!Array.isArray(i.ls)){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}i.ls.forEach(l=>{if(!l.id)l.id=uid();if(!Number.isFinite(l.at))l.at=Date.now()})}))};mig();
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e});
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}clearTimeout(save.t);save.t=setTimeout(()=>window.sched&&sched(),300)},T=(a,e)=>S.lang==='ar'?a:e,loc=()=>S.lang==='ar'?'ar-EG':'en-GB';
 const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -128,11 +129,95 @@ nat:async()=>{if(!LN)return;try{const p=await LN.requestPermissions();let ex='?'
 tst:async()=>{try{await LN.schedule({notifications:[{id:1,title:T('تجربة إشعار','Test'),body:T('الإشعارات شغالة ✓','Notifications work ✓'),channelId:'rem',schedule:{at:new Date(Date.now()+5000),allowWhileIdle:true}}]});toast(T('هيجيلك إشعار بعد 5 ثواني','Test in 5 seconds'))}catch(x){toast('⚠ '+(x.message||x))}},
 inst:()=>ip?ip.prompt():toast(T('افتح قائمة كروم ⋮ واختر «تثبيت التطبيق»','Chrome menu ⋮ → Install app')),
 st:(i,b)=>{S[b.dataset.k]=i;up()},en:()=>{if(!('Notification'in window))return toast(T('المتصفح لا يدعم الإشعارات','Not supported'));Notification.requestPermission().then(()=>{render();pins()})},
-ex:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='progress-backup-'+iso(new Date())+'.json';a.click()},im:()=>$('#imp').click()};
+ex:async()=>{let js,nm;try{js=JSON.stringify(S,null,2);const d=new Date();nm='enjazi-backup-'+iso(d)+'_'+p2(d.getHours())+'-'+p2(d.getMinutes())+'.json'}catch(x){return toast(T('تعذّر تجهيز النسخة الاحتياطية','Could not prepare the backup'))}
+if(!CAP){try{const url=URL.createObjectURL(new Blob([js],{type:'application/json;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=nm;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);return toast(T('بدأ تنزيل النسخة الاحتياطية','Backup download started'))}catch(x){return toast(T('تعذّر تنزيل النسخة الاحتياطية: ','Could not download backup: ')+(x&&x.message||x))}}
+const FS=NP.Filesystem,SH=NP.Share;if(!FS||!SH||!NP.Directory||!NP.Encoding)return toast(T('مكوّنات النسخ الاحتياطي غير موجودة في هذه النسخة. أعد بناء التطبيق.','Backup plugins are missing from this build. Rebuild the app.'));
+try{const cs=await SH.canShare();if(cs&&cs.value===false)return toast(T('مشاركة الملفات غير مدعومة على هذا الجهاز','File sharing is not supported on this device'))}catch(x){}
+let uri;try{const result=await FS.writeFile({path:nm,data:js,directory:NP.Directory.Cache,encoding:NP.Encoding.UTF8});uri=result&&result.uri;if(!uri)throw new Error('Filesystem returned no file URI')}catch(x){return toast(T('تعذّر إنشاء ملف النسخة الاحتياطية: ','Could not create the backup file: ')+(x&&x.message||x))}
+try{await SH.share({title:nm,text:T('نسخة احتياطية من تطبيق إنجازي','Enjazi app backup'),dialogTitle:T('اختار مكان حفظ النسخة الاحتياطية','Choose where to save the backup'),files:[uri]});toast(T('تم فتح قائمة المشاركة. اختار تطبيقًا أو مكانًا لحفظ الملف.','Share sheet opened. Choose an app or destination to save the file.'))}catch(x){const m=String(x&&x.message||x);toast(/cancel/i.test(m)?T('تم إغلاق المشاركة. لو لم تحفظ الملف، جرّب التصدير مرة أخرى.','Sharing was closed. If you did not save the file, export again.'):T('تعذّر فتح قائمة المشاركة: ','Could not open the share sheet: ')+m)}},
+im:()=>$('#imp').click()};
 document.addEventListener('click',e=>{if(e.target.id==='sh')return H.cx();const b=e.target.closest('[data-a]');if(b&&H[b.dataset.a])H[b.dataset.a](b.dataset.i,b)});
 document.addEventListener('input',e=>{if(e.target.id==='q'){f.q=e.target.value.toLowerCase();$('#lst').innerHTML=lst()}});
-$('#imp').addEventListener('change',e=>{const r=new FileReader();r.onload=()=>{try{S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},JSON.parse(r.result));mig();up();toast('✓')}catch(x){toast(T('ملف غير صالح','Invalid file'))}};r.readAsText(e.target.files[0])});
-document.addEventListener('keydown',e=>{if(e.key==='Enter'){if(e.target.id==='nl')H.al();if(e.target.id==='qa')H.qa()}});const CAP=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()),LN=CAP?Capacitor.Plugins.LocalNotifications:null;
+const vld=o=>{
+const B=(v,t)=>typeof v===t,N=v=>B(v,'number')&&Number.isFinite(v),R=v=>v!==null&&B(v,'object')&&!Array.isArray(v),AR=Array.isArray;
+const W=(a,b)=>T('الملف تالف — '+a,'Corrupted file — '+b),has=(v)=>v!==undefined&&v!==null;
+const text=(v,max=5000)=>B(v,'string')&&v.length<=max;
+const stamp=v=>N(v)&&Math.abs(v)<=8640000000000000;
+const date=v=>{if(!B(v,'string')||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const [y,m,d]=v.split('-').map(Number),x=new Date(Date.UTC(y,m-1,d));return x.getUTCFullYear()===y&&x.getUTCMonth()===m-1&&x.getUTCDate()===d};
+const time=v=>B(v,'string')&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+const ids=new Set(),addId=(v)=>{if(!text(v,256)||!v.trim()||ids.has(v))return false;ids.add(v);return true};
+if(!R(o)||(o.tasks===undefined&&o.groups===undefined))return T('هذا الملف ليس نسخة احتياطية من إنجازي','This is not an Enjazi backup file');
+if((has(o.tasks)&&!AR(o.tasks))||(has(o.groups)&&!AR(o.groups))||(has(o.cats)&&!(AR(o.cats)&&o.cats.every(c=>text(c,200)))))return W('بنية الأقسام أو المهام','tasks/sections structure');
+if(has(o.lang)&&!['ar','en'].includes(o.lang))return W('اللغة','language');
+if(has(o.th)&&!['light','dark','sepia'].includes(o.th))return W('المظهر','theme');
+if(has(o.fs)&&!['s','m','l'].includes(o.fs))return W('حجم الخط','font size');
+if(has(o.pin)&&!(AR(o.pin)&&o.pin.every(v=>Number.isSafeInteger(v)&&v>=0&&v<=2147483647)))return W('بيانات الإشعارات','notification data');
+for(const [i,x] of (o.tasks||[]).entries()){
+ const label=T('المهمة رقم '+(i+1),'task #'+(i+1)),err=(a,b)=>W(label+' — '+a,label+' — '+b);
+ if(!R(x)||!addId(x.id)||!text(x.t,1000)||!x.t.trim())return err('بيانات المهمة أو معرّف مكرر','invalid task data or duplicate ID');
+ if(has(x.n)&&!text(x.n,10000))return err('الوصف','description');
+ if(has(x.c)&&!text(x.c,200))return err('التصنيف','category');
+ if(has(x.d)&&x.d!==''&&!date(x.d))return err('التاريخ غير صحيح','invalid calendar date');
+ if(has(x.tm)&&x.tm!==''&&!time(x.tm))return err('الوقت غير صحيح','invalid time');
+ if(has(x.rms)&&!(AR(x.rms)&&x.rms.every(v=>Number.isSafeInteger(v)&&v>=0&&v<=10080)))return err('التذكيرات','reminders');
+ if(has(x.rm)&&!(Number.isSafeInteger(x.rm)&&(x.rm===-1||(x.rm>=0&&x.rm<=10080))))return err('التذكير القديم','legacy reminder');
+ if(has(x.rp)&&!['','d','w','m','y'].includes(x.rp))return err('تكرار المهمة','repeat setting');
+ if(has(x.p)&&!(Number.isInteger(x.p)&&[1,2,3].includes(x.p)))return err('الأولوية','priority');
+ if(has(x.pin)&&!B(x.pin,'boolean'))return err('تثبيت الإشعار','pinned notification');
+ if(has(x.x)&&!(B(x.x,'boolean')||(N(x.x)&&x.x>=0&&stamp(x.x))))return err('حالة الإنجاز','completion state');
+ if(has(x.fired)&&!(B(x.fired,'boolean')||(N(x.fired)&&[0,1].includes(x.fired))))return err('حالة التذكير','reminder state');
+ if(has(x.lk)&&!text(x.lk,600))return err('ربط المادة','linked item');
+ if(has(x.sub)&&!(AR(x.sub)&&x.sub.every(a=>R(a)&&text(a.t,1000)&&(!has(a.x)||B(a.x,'boolean')||a.x===0||a.x===1))))return err('المهام الفرعية','subtasks');
+}
+for(const [i,g] of (o.groups||[]).entries()){
+ const label=T('القسم رقم '+(i+1),'section #'+(i+1));
+ if(!R(g)||!addId(g.id)||!text(g.n,300)||!g.n.trim()||!AR(g.it))return W(label+' — بيانات القسم أو معرّف مكرر',label+' — invalid section data or duplicate ID');
+ for(const [j,it] of g.it.entries()){
+  const itemLabel=label+T(' — المادة رقم ',' — item #')+(j+1),err=(a,b)=>W(itemLabel+' — '+a,itemLabel+' — '+b);
+  if(!R(it)||!addId(it.id)||!text(it.n,500)||!it.n.trim())return err('بيانات المادة أو معرّف مكرر','invalid item data or duplicate ID');
+  if(has(it.total)&&!(N(it.total)&&it.total>=0&&it.total<=1000000))return err('العدد الكلي','total count');
+  if(has(it.done)&&!(Number.isSafeInteger(it.done)&&it.done>=0&&it.done<=1000000))return err('عدد المنجز','completed count');
+  if(has(it.last)&&!stamp(it.last))return err('تاريخ آخر إنجاز','last completion timestamp');
+  if(has(it.ls)&&!AR(it.ls))return err('قائمة المحاضرات','lecture list');
+  for(const [k,l] of (it.ls||[]).entries()){
+   const lectureLabel=itemLabel+T(' — المحاضرة رقم ',' — lecture #')+(k+1);
+   if(!R(l)||!text(l.n,1000)||!l.n.trim())return W(lectureLabel+' — الاسم غير صحيح',lectureLabel+' — invalid name');
+   if(has(l.id)&&!addId(l.id))return W(lectureLabel+' — معرّف فارغ أو مكرر',lectureLabel+' — empty or duplicate ID');
+   if(has(l.at)&&!stamp(l.at))return W(lectureLabel+' — التاريخ غير صحيح',lectureLabel+' — invalid timestamp');
+  }
+ }
+}
+return '';
+};
+$('#imp').addEventListener('change',e=>{
+ const el=e.target,fl=el.files&&el.files[0];if(!fl)return;
+ if(fl.size>10*1024*1024){toast(T('حجم ملف النسخة أكبر من 10 ميجابايت','Backup file is larger than 10 MB'));el.value='';return}
+ const r=new FileReader(),cn=a=>(a.groups||[]).reduce((n,g)=>n+g.it.length,0);
+ r.onerror=()=>toast(T('تعذّرت قراءة الملف','Could not read the file'));
+ r.onloadend=()=>{el.value=''};
+ r.onload=()=>{
+  let o;try{o=JSON.parse(r.result)}catch(x){return toast(T('الملف ليس نسخة احتياطية صالحة (ملف JSON تالف)','Not a valid backup (broken JSON file)'))}
+  const er=vld(o);if(er)return toast(er);
+  if(!confirm(T(`سيتم استبدال بياناتك الحالية (${S.tasks.length} مهمة، ${cn(S)} مادة) ببيانات الملف (${(o.tasks||[]).length} مهمة، ${cn(o)} مادة). هل تريد المتابعة؟`,`Your current data (${S.tasks.length} tasks, ${cn(S)} items) will be replaced by the file's data (${(o.tasks||[]).length} tasks, ${cn(o)} items). Continue?`)))return toast(T('تم الإلغاء — لم تتغيّر بياناتك','Cancelled — your data was not changed'));
+  const previous=S;
+  try{
+   clearTimeout(save.t);save.t=null;
+   const imported=JSON.parse(JSON.stringify(o));
+   const next=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},imported);
+   S=next;mig();
+   localStorage.setItem(K,JSON.stringify(S));
+   render();if(LN)sched();
+   toast(T(`✓ تم الاستيراد: ${S.tasks.length} مهمة، ${cn(S)} مادة`,`✓ Imported: ${S.tasks.length} tasks, ${cn(S)} items`));
+  }catch(x){
+   S=previous;
+   try{localStorage.setItem(K,JSON.stringify(previous))}catch(restoreError){}
+   render();
+   toast(T('فشل الاستيراد — تم الاحتفاظ ببياناتك الحالية','Import failed — your current data was kept'));
+  }
+ };
+ r.readAsText(fl);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){if(e.target.id==='nl')H.al();if(e.target.id==='qa')H.qa()}});const CAP=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()),NP=CAP&&window.NativePlugins||{},LN=NP.LocalNotifications||null;
 const hid=s=>{let x=7;for(const c of s)x=(x*31+c.charCodeAt(0))|0;return Math.abs(x)%2e9+1};
 const rl=r=>r>=1440?T('يوم','1 day'):r>=60?r/60+T(' ساعة',' h'):r+T(' د',' min');
 const cd=x=>{const d=due(x);if(!d)return'';let m=Math.round((d-Date.now())/6e4);const o=m<0;m=Math.abs(m);const t=m>=1440?Math.floor(m/1440)+T(' يوم',' d'):m>=60?Math.floor(m/60)+T(' س',' h')+(m%60?' '+m%60+T(' د',' m'):''):m+T(' د',' m');return o?T('متأخرة ','Overdue ')+t:T('باقي ','in ')+t};
