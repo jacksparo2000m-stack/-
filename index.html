@@ -45,7 +45,7 @@ const iso=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
 let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
 S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},S||{});
 let v='todo',f={tab:'all',cat:'',q:'',open:0},D=null,P={g:null,i:null},ip=null;
-const mig=()=>{S.tasks.forEach(x=>{if(!Array.isArray(x.rms))x.rms=x.rm>=0?[x.rm]:[]});S.groups.forEach(g=>g.it.forEach(i=>{if(!Array.isArray(i.ls)){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}i.ls.forEach(l=>{if(!l.id)l.id=uid();if(!Number.isFinite(l.at))l.at=Date.now()})}))};mig();
+const mig=(s=S)=>{s.tasks.forEach(x=>{if(!Array.isArray(x.rms))x.rms=x.rm>=0?[x.rm]:[]});s.groups.forEach(g=>g.it.forEach(i=>{if(!Array.isArray(i.ls)){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}i.ls.forEach(l=>{if(!l.id)l.id=uid();if(!Number.isFinite(l.at))l.at=Date.now()})}))};mig();
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e});
 const save=()=>{   let ok=true;   try{     localStorage.setItem(K,JSON.stringify(S));   }catch(e){     ok=false;     console.error('ENJAZI save failed:',e);     if(typeof toast==='function')toast(T('فشل حفظ البيانات! مساحة التخزين قد تكون ممتلئة.','Failed to save data! Storage may be full.'));   }   clearTimeout(save.t);   save.t=setTimeout(()=>window.sched&&sched(),300);   return ok; },T=(a,e)=>S.lang==='ar'?a:e,loc=()=>S.lang==='ar'?'ar-EG':'en-GB';
 const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -197,34 +197,87 @@ for(const [i,x] of (o.tasks||[]).entries()){
 }
 return '';
 };
- $('#imp').addEventListener('change',e=>{
+$('#imp').addEventListener('change',e=>{
  const el=e.target,fl=el.files&&el.files[0];if(!fl)return;
- if(fl.size>10*1024*1024){toast(T('حجم ملف النسخة أكبر من 10 ميجابايت','Backup file is larger than 10 MB'));el.value='';return}
+ if(fl.size>10*1024*1024){
+  toast(T('حجم ملف النسخة أكبر من 10 ميجابايت','Backup file is larger than 10 MB'));
+  el.value='';return;
+ }
  const r=new FileReader(),cn=a=>(a.groups||[]).reduce((n,g)=>n+g.it.length,0);
  r.onerror=()=>toast(T('تعذّرت قراءة الملف','Could not read the file'));
  r.onloadend=()=>{el.value=''};
  r.onload=()=>{
-  let o;try{o=JSON.parse(r.result)}catch(x){return toast(T('الملف ليس نسخة احتياطية صالحة (ملف JSON تالف)','Not a valid backup (broken JSON file)'))}
-  const er=vld(o);if(er)return toast(er);
-  if(!confirm(T(`سيتم استبدال بياناتك الحالية (${S.tasks.length} مهمة، ${cn(S)} مادة) ببيانات الملف (${(o.tasks||[]).length} مهمة، ${cn(o)} مادة). هل تريد المتابعة؟`,`Your current data (${S.tasks.length} tasks, ${cn(S)} items) will be replaced by the file's data (${(o.tasks||[]).length} tasks, ${cn(o)} items). Continue?`)))return toast(T('تم الإلغاء — لم تتغيّر بياناتك','Cancelled — your data was not changed'));
-  const previous=S;
+  let o;
+  try{o=JSON.parse(r.result)}
+  catch(x){
+   return toast(T('الملف ليس نسخة احتياطية صالحة (ملف JSON تالف)','Not a valid backup (broken JSON file)'));
+  }
+
+  const er=vld(o);
+  if(er)return toast(er);
+
+  if(!confirm(T(
+   `سيتم استبدال بياناتك الحالية (${S.tasks.length} مهمة، ${cn(S)} مادة) ببيانات الملف (${(o.tasks||[]).length} مهمة، ${cn(o)} مادة). هل تريد المتابعة؟`,
+   `Your current data (${S.tasks.length} tasks, ${cn(S)} items) will be replaced by the file's data (${(o.tasks||[]).length} tasks, ${cn(o)} items). Continue?`
+  )))return toast(T('تم الإلغاء — لم تتغيّر بياناتك','Cancelled — your data was not changed'));
+
+  
+    let committed=false;
+
   try{
-   clearTimeout(save.t);save.t=null;
+   clearTimeout(save.t);
+   save.t=null;
+
    const imported=JSON.parse(JSON.stringify(o));
-   const next=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},imported);
-   S=next;mig();
-   localStorage.setItem(K,JSON.stringify(S));
-   render();if(LN)sched();
-   toast(T(`✓ تم الاستيراد: ${S.tasks.length} مهمة، ${cn(S)} مادة`,`✓ Imported: ${S.tasks.length} tasks, ${cn(S)} items`));
+   const next=Object.assign({
+    lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]
+   },imported);
+
+   mig(next);
+
+   const postError=vld(next);
+   if(postError)return toast(postError);
+
+   const payload=JSON.stringify(next);
+   localStorage.setItem(K,payload);
+
+   S=next;
+   committed=true;
+
   }catch(x){
-   S=previous;
-   try{localStorage.setItem(K,JSON.stringify(previous))}catch(restoreError){}
-   render();
-   toast(T('فشل الاستيراد — تم الاحتفاظ ببياناتك الحالية','Import failed — your current data was kept'));
+   console.error('ENJAZI import failed:',x);
+   return toast(T(
+    'فشل الاستيراد — لم يتم اعتماد البيانات الجديدة',
+    'Import failed — new data was not committed'
+   ));
+  }
+  if(committed){
+   let displayError=false;
+
+   try{render()}
+   catch(x){
+    displayError=true;
+    console.error('ENJAZI render after import failed:',x);
+   }
+
+   if(LN)sched();
+
+   if(displayError){
+    toast(T(
+     'تم حفظ البيانات، لكن حدث خطأ في تحديث العرض. أعد فتح التطبيق.',
+     'Data saved, but the display could not refresh. Reopen the app.'
+    ));
+   }else{
+    toast(T(
+     `✓ تم الاستيراد: ${S.tasks.length} مهمة، ${cn(S)} مادة`,
+     `✓ Imported: ${S.tasks.length} tasks, ${cn(S)} items`
+    ));
+   }
   }
  };
  r.readAsText(fl);
 });
+
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){if(e.target.id==='nl')H.al();if(e.target.id==='qa')H.qa()}});const CAP=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()),NP=CAP&&window.NativePlugins||{},LN=NP.LocalNotifications||null;
 const hid=s=>{let x=7;for(const c of s)x=(x*31+c.charCodeAt(0))|0;return Math.abs(x)%2e9+1};
 const rl=r=>r>=1440?T('يوم','1 day'):r>=60?r/60+T(' ساعة',' h'):r+T(' د',' min');
