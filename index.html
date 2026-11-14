@@ -47,7 +47,7 @@ S=Object.assign({lang:'ar',th:'light',fs:'m',tasks:[],groups:[],cats:[]},S||{});
 let v='todo',f={tab:'all',cat:'',q:'',open:0},D=null,P={g:null,i:null},ip=null;
 const mig=()=>{S.tasks.forEach(x=>{if(!Array.isArray(x.rms))x.rms=x.rm>=0?[x.rm]:[]});S.groups.forEach(g=>g.it.forEach(i=>{if(!Array.isArray(i.ls)){i.ls=[];for(let k=1;k<=(i.done||0);k++)i.ls.push({id:uid(),n:'محاضرة '+k,at:i.last||Date.now()})}i.ls.forEach(l=>{if(!l.id)l.id=uid();if(!Number.isFinite(l.at))l.at=Date.now()})}))};mig();
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();ip=e});
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}clearTimeout(save.t);save.t=setTimeout(()=>window.sched&&sched(),300)},T=(a,e)=>S.lang==='ar'?a:e,loc=()=>S.lang==='ar'?'ar-EG':'en-GB';
+const save=()=>{   let ok=true;   try{     localStorage.setItem(K,JSON.stringify(S));   }catch(e){     ok=false;     console.error('ENJAZI save failed:',e);     if(typeof toast==='function')toast(T('فشل حفظ البيانات! مساحة التخزين قد تكون ممتلئة.','Failed to save data! Storage may be full.'));   }   clearTimeout(save.t);   save.t=setTimeout(()=>window.sched&&sched(),300);   return ok; },T=(a,e)=>S.lang==='ar'?a:e,loc=()=>S.lang==='ar'?'ar-EG':'en-GB';
 const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const due=x=>x.d?new Date(x.d+'T'+(x.tm||'23:59')):null,od=x=>!x.x&&due(x)&&due(x)<new Date();
 const pct=(a,b)=>b?Math.round(a/b*100):0,bar=p=>`<div class="bar"><i style="width:${p}%"></i></div>`;
