@@ -104,7 +104,7 @@ ${lk.length?`<label>${T('اربطها بمادة في جدول الإنجاز','
 <div class="two" style="margin-top:16px"><button class="btn o" data-a="cx">${T('إلغاء','Cancel')}</button><button class="btn" data-a="sv">${T('حفظ','Save')}</button></div></div>`;$('#sh').hidden=0;wset()}
 const lkd=(x,dl)=>{if(!x.lk)return;const[g,i]=x.lk.split(':'),t=(S.groups.find(a=>a.id===g)||{it:[]}).it.find(a=>a.id===i);if(!t)return;const id='t'+x.id;t.ls=t.ls.filter(l=>l.id!==id);if(dl>0)t.ls.push({id,n:x.t,at:Date.now()})};
 const nd=(d,r)=>{const t=new Date(d+'T00:00');r==='d'?t.setDate(t.getDate()+1):r==='w'?t.setDate(t.getDate()+7):r==='m'?t.setMonth(t.getMonth()+1):t.setFullYear(t.getFullYear()+1);return iso(t)};
-const pr=(m,def)=>{const r=prompt(m,def);return r&&r.trim()?r.trim():null},it2=i=>{const[g,k]=i.split('|'),G=S.groups.find(a=>a.id===g);return[G,G.it.find(a=>a.id===k)]},up=()=>{save();render()};
+const pr=(m,def)=>{const r=prompt(m,def);return r&&r.trim()?r.trim():null},it2=i=>{const[g,k]=i.split('|'),G=S.groups.find(a=>a.id===g);return[G,G.it.find(a=>a.id===k)]},up=()=>{if(save())render()};
  const unlinkItems=(groupId,items)=>{const keys=new Set(items.map(i=>groupId+':'+i.id));S.tasks.forEach(x=>{if(x.lk&&keys.has(x.lk))x.lk='';});};
 const H={nv:i=>{v=i;render()},tb:i=>{f.tab=i;render()},fc:i=>{f.cat=i;render()},co:()=>{f.open=!f.open;$('#lst').innerHTML=lst()},add:()=>openSheet(),ed:i=>openSheet(i),
 tg:i=>{const x=S.tasks.find(a=>a.id===i);x.x=x.x?0:Date.now();lkd(x,x.x?1:-1);if(x.x&&x.rp&&x.d)S.tasks.push({...x,id:uid(),x:0,fr:[],d:nd(x.d,x.rp),sub:(x.sub||[]).map(s=>({...s,x:0}))});up();pins()},
@@ -188,9 +188,16 @@ for(const [i,g] of (o.groups||[]).entries()){
   }
  }
 }
+for(const [i,x] of (o.tasks||[]).entries()){
+ if(!x.lk)continue;
+ const parts=x.lk.split(':');
+ if(parts.length!==2||!parts[0]||!parts[1])return W('المهمة رقم '+(i+1)+' — رابط المادة غير صالح','task #'+(i+1)+' — invalid linked item');
+ const g=(o.groups||[]).find(a=>a.id===parts[0]);
+ if(!g||!g.it.some(a=>a.id===parts[1]))return W('المهمة رقم '+(i+1)+' — المادة المرتبطة غير موجودة','task #'+(i+1)+' — linked item does not exist');
+}
 return '';
 };
-$('#imp').addEventListener('change',e=>{
+ $('#imp').addEventListener('change',e=>{
  const el=e.target,fl=el.files&&el.files[0];if(!fl)return;
  if(fl.size>10*1024*1024){toast(T('حجم ملف النسخة أكبر من 10 ميجابايت','Backup file is larger than 10 MB'));el.value='';return}
  const r=new FileReader(),cn=a=>(a.groups||[]).reduce((n,g)=>n+g.it.length,0);
