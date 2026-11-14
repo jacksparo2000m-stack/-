@@ -105,10 +105,11 @@ ${lk.length?`<label>${T('اربطها بمادة في جدول الإنجاز','
 const lkd=(x,dl)=>{if(!x.lk)return;const[g,i]=x.lk.split(':'),t=(S.groups.find(a=>a.id===g)||{it:[]}).it.find(a=>a.id===i);if(!t)return;const id='t'+x.id;t.ls=t.ls.filter(l=>l.id!==id);if(dl>0)t.ls.push({id,n:x.t,at:Date.now()})};
 const nd=(d,r)=>{const t=new Date(d+'T00:00');r==='d'?t.setDate(t.getDate()+1):r==='w'?t.setDate(t.getDate()+7):r==='m'?t.setMonth(t.getMonth()+1):t.setFullYear(t.getFullYear()+1);return iso(t)};
 const pr=(m,def)=>{const r=prompt(m,def);return r&&r.trim()?r.trim():null},it2=i=>{const[g,k]=i.split('|'),G=S.groups.find(a=>a.id===g);return[G,G.it.find(a=>a.id===k)]},up=()=>{save();render()};
+ const unlinkItems=(groupId,items)=>{const keys=new Set(items.map(i=>groupId+':'+i.id));S.tasks.forEach(x=>{if(x.lk&&keys.has(x.lk))x.lk='';});};
 const H={nv:i=>{v=i;render()},tb:i=>{f.tab=i;render()},fc:i=>{f.cat=i;render()},co:()=>{f.open=!f.open;$('#lst').innerHTML=lst()},add:()=>openSheet(),ed:i=>openSheet(i),
 tg:i=>{const x=S.tasks.find(a=>a.id===i);x.x=x.x?0:Date.now();lkd(x,x.x?1:-1);if(x.x&&x.rp&&x.d)S.tasks.push({...x,id:uid(),x:0,fr:[],d:nd(x.d,x.rp),sub:(x.sub||[]).map(s=>({...s,x:0}))});up();pins()},
-del:i=>{if(confirm(T('حذف المهمة؟','Delete task?'))){S.tasks=S.tasks.filter(x=>x.id!==i);up();pins()}},
-clr:()=>{if(confirm(T('مسح كل المهام المنجزة؟','Clear all completed tasks?'))){S.tasks=S.tasks.filter(x=>!x.x);up()}},
+del:i=>{if(confirm(T('حذف المهمة؟','Delete task?'))){const x=S.tasks.find(a=>a.id===i);if(x&&x.x)lkd(x,-1);S.tasks=S.tasks.filter(x=>x.id!==i);up();pins()}},
+clr:()=>{if(confirm(T('مسح كل المهام المنجزة؟','Clear all completed tasks?'))){S.tasks.filter(x=>x.x).forEach(x=>lkd(x,-1));S.tasks=S.tasks.filter(x=>!x.x);up()}},
 qd:i=>{sync();const t=new Date();t.setDate(t.getDate()+ +i);D.d=iso(t);draw()},pr:i=>{sync();D.p=+i;draw()},cc:i=>{sync();D.c=i;draw()},
 as:()=>{sync();const e=$('#fs').value.trim();if(e){D.sub.push({t:e,x:0});draw()}},rs:i=>{sync();D.sub.splice(+i,1);draw()},ts:i=>{sync();D.sub[+i].x=D.sub[+i].x?0:1;draw()},
 cx:()=>{D=null;$('#sh').hidden=1},sv:()=>{sync();if(!D.t.trim())return toast(T('اكتب عنوان المهمة','Enter a title'));D.t=D.t.trim();D.fr=[];
@@ -117,11 +118,11 @@ if(D.c&&!S.cats.includes(D.c))S.cats.push(D.c);D=null;$('#sh').hidden=1;up();pin
 og:i=>{P={g:i,i:null};render()},oi:i=>{P.i=i;render()},bk:()=>{P.i?P.i=null:P.g=null;render()},
 ag:()=>{const n=pr(T('اسم القسم؟ (مثال: مواد الكلية)','Section name?'));if(n){S.groups.push({id:uid(),n,it:[]});up()}},
 ai:i=>{const n=pr(T('اسم المادة أو المشروع؟','Name?'));if(!n)return;const t=num(pr(T('العدد الكلي للمحاضرات/الأجزاء؟ (اختياري — اتركه فاضي لو مش عارف، والتطبيق هيعدّ اللي تخلصه)','Total lectures/parts? (optional — leave empty if unknown)'),''));S.groups.find(a=>a.id===i).it.push({id:uid(),n,total:t,ls:[]});up()},
-dg:i=>{if(confirm(T('حذف القسم بكل ما فيه؟','Delete section?'))){S.groups=S.groups.filter(a=>a.id!==i);P={g:null,i:null};up()}},
+dg:i=>{if(confirm(T('حذف القسم بكل ما فيه؟','Delete section?'))){const g=S.groups.find(a=>a.id===i);if(g)unlinkItems(i,g.it);S.groups=S.groups.filter(a=>a.id!==i);P={g:null,i:null};up()}},
 al:()=>{const e=$('#nl'),I=cur(),a=e.value.split(/[,،]/).map(x=>x.trim()).filter(Boolean);if(!a.length)a.push(T('محاضرة ','Lecture ')+nx(I));a.forEach(n=>I.ls.push({id:uid(),n,at:Date.now()}));up()},
 rl:i=>{const I=cur();I.ls=I.ls.filter(l=>l.id!==i);up()},el:i=>{const l=cur().ls.find(a=>a.id===i),n=pr(T('اسم المحاضرة؟','Lecture name?'),l.n);if(n){l.n=n;up()}},
 et:()=>{const I=cur(),r=prompt(T('العدد الكلي؟ (اتركه فاضي لو مش عارف)','Total? (empty = unknown)'),I.total||'');if(r===null)return;I.total=num(r);up()},
-di:()=>{if(confirm(T('حذف المادة؟','Delete?'))){const G=S.groups.find(a=>a.id===P.g);G.it=G.it.filter(a=>a.id!==P.i);P.i=null;up()}},
+di:()=>{if(confirm(T('حذف المادة؟','Delete?'))){const G=S.groups.find(a=>a.id===P.g);const item=G&&G.it.find(a=>a.id===P.i);if(item)unlinkItems(P.g,[item]);if(G)G.it=G.it.filter(a=>a.id!==P.i);P.i=null;up()}},
 rmt:i=>{sync();const r=+i;D.rms=D.rms.includes(r)?D.rms.filter(z=>z!==r):[...D.rms,r];draw()},ct:()=>{sync();D.tm='';draw()},
 qt:i=>{sync();const t=new Date();if(i==='h')t.setHours(t.getHours()+1);else if(i==='n')t.setHours(20,0,0,0);else{t.setDate(t.getDate()+1);t.setHours(9,0,0,0)}D.d=iso(t);D.tm=p2(t.getHours())+':'+p2(t.getMinutes());if(!D.rms.length)D.rms=[0];draw()},
 qa:()=>{const t=nlp($('#qa').value);if(!t)return toast(T('اكتب المهمة','Type a task'));S.tasks.push(t);up();toast('✓ '+t.t+(t.d?' · '+fdt(t.d,t.tm):''))},
